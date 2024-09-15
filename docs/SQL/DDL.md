@@ -78,14 +78,13 @@ CREATE TABLE disciplina_ofertada(
     id SERIAL NOT NULL,
     codigo CodigoDisciplina NOT NULL,
     periodo NUMERIC(5, 1) NOT NULL,
-    turma SMALLINT NOT NULL,
+    turma CHAR(5) NOT NULL,
     horario CHAR(30) NOT NULL,
     complemento_horario CHAR(30) NULL,
     vagas_total SMALLINT NOT NULL,
     vagas_ocupadas SMALLINT NOT NULL CHECK (vagas_ocupadas <= vagas_total),
     lugar INTEGER NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (codigo) REFERENCES disciplina(codigo),
     FOREIGN KEY (lugar) REFERENCES lugar(id),
 	CONSTRAINT unique_codigox_oferta UNIQUE (codigo, periodo, turma)
 );
