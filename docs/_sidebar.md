@@ -3,7 +3,7 @@
   * Acesso ao Banco
   * SQL
     * [Modelo Relacional]()
-    * [DDL]()
+    * [DDL](SQL/DDL.md)
     * [Triggers e Stored Procedure]()
 * Scraper
   * [Como Usar?]()
