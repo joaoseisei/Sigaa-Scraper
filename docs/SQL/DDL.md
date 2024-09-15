@@ -87,7 +87,8 @@ CREATE TABLE requisitos (
     prerequisito TEXT NULL,
     coequivalencia TEXT NULL,
     equivalencia TEXT NULL,
-    PRIMARY KEY (codigo)
+    PRIMARY KEY (codigo),
+    FOREIGN KEY (codigo) REFERENCES disciplina(codigo)
 );
 
 CREATE TABLE equivalencia (
