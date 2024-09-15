@@ -7,6 +7,8 @@
 ---
 
 ````sql
+BEGIN;
+
 CREATE FUNCTION inserir_oferta(
     _codigo CodigoDisciplina, 
     _periodo NUMERIC(5, 1), 
@@ -15,7 +17,7 @@ CREATE FUNCTION inserir_oferta(
     _complemento_horario CHAR(30), 
     _vagas_total SMALLINT, 
     _vagas_ocupadas SMALLINT, 
-    _local CHAR(60), 
+    _lugar INTEGER, 
     _professores TEXT[]
 )
 RETURNS VOID AS $$
@@ -26,18 +28,18 @@ DECLARE
 BEGIN
     INSERT INTO disciplina_ofertada (
         codigo, periodo, turma, horario, complemento_horario, 
-        vagas_total, vagas_ocupadas, local
+        vagas_total, vagas_ocupadas, lugar
     )
     VALUES (
         _codigo, _periodo, _turma, _horario, _complemento_horario, 
-        _vagas_total, _vagas_ocupadas, _local
+        _vagas_total, _vagas_ocupadas, _lugar
     )
     RETURNING id INTO id_oferta; 
 
     FOREACH prof IN ARRAY _professores
     LOOP
         SELECT id INTO id_prof FROM professor WHERE nome = prof;
-
+        
         IF NOT FOUND THEN
             INSERT INTO professor (nome)
             VALUES (prof) 
@@ -72,4 +74,28 @@ BEGIN
     RETURN id_unidade;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+   
+CREATE FUNCTION inserir_lugar(
+    _nome TEXT
+)
+RETURNS INTEGER AS $$
+DECLARE
+    id_lugar INTEGER;
+BEGIN
+    SELECT id INTO id_lugar 
+    FROM lugar 
+    WHERE nome = _nome;
+
+    IF NOT FOUND THEN
+        INSERT INTO lugar (nome)
+        VALUES (_nome)
+        RETURNING id INTO id_lugar;
+    END IF;
+
+    RETURN id_lugar;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+COMMIT;
+
 ````

@@ -66,6 +66,14 @@ CREATE TABLE professor_oferta (
     PRIMARY KEY (professor, disciplina_ofertada)
 );
 
+CREATE TABLE lugar (
+    id SERIAL NOT NULL,
+    nome TEXT UNIQUE NOT NULL,
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX nomex_lugar ON lugar(nome);
+
 CREATE TABLE disciplina_ofertada(
     id SERIAL NOT NULL,
     codigo CodigoDisciplina NOT NULL,
@@ -75,9 +83,11 @@ CREATE TABLE disciplina_ofertada(
     complemento_horario CHAR(30) NULL,
     vagas_total SMALLINT NOT NULL,
     vagas_ocupadas SMALLINT NOT NULL CHECK (vagas_ocupadas <= vagas_total),
-    local CHAR(60) NOT NULL,
+    lugar INTEGER NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (codigo) REFERENCES disciplina(codigo)
+    FOREIGN KEY (codigo) REFERENCES disciplina(codigo),
+    FOREIGN KEY (lugar) REFERENCES lugar(id),
+	CONSTRAINT unique_codigox_oferta UNIQUE (codigo, periodo, turma)
 );
 
 CREATE INDEX codigox_oferta ON disciplina_ofertada(codigo, periodo, turma);

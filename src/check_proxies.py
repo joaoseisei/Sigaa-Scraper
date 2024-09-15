@@ -19,7 +19,7 @@ def check_proxies():
     while not fila.empty():
         proxy = fila.get()
         try:
-            res = requests.get('https://www.meuip.com.br/', proxies={'http': proxy, 'https': proxy}, timeout=5)
+            res = requests.get('https://sigaa.unb.br/sigaa/public/turmas/listar.jsf', proxies={'http': proxy, 'https': proxy}, timeout=5)
             if res.status_code == 200:
                 print(f"\033[92mProxy válido: {proxy}\033[0m")
                 with lock:
@@ -29,7 +29,7 @@ def check_proxies():
         finally:
             fila.task_done()
 
-for _ in range(50):
+for _ in range(10):
     threading.Thread(target=check_proxies).start()
 
 fila.join()

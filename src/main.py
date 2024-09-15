@@ -5,8 +5,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
 import psycopg2
+import threading
 
 logo = r"""
 $$\   $$\ $$$$$$$\                                     $$$$$$\   $$$$$$\  
@@ -21,6 +22,7 @@ $$ | \$$\ $$$$$$$  |$$ | $$ | $$ |\$$$$$$$\ \$$$$$$  |\$$$$$$  |\$$$$$$  |
 
 with open('proxies_funcionais.txt', 'r') as f:
     proxies = f.read().split("\n")
+
 
 class DatabaseConnection:
     def __init__(self):
@@ -82,22 +84,21 @@ db = DatabaseConnection()
 class SigaaScraper:
     def __init__(self):
         self.url = "https://sigaa.unb.br/sigaa/public/turmas/listar.jsf"
+        self.timeout = 2
         self.contador_proxies = 0
-        self.proxy = proxies[0]
-        self.timeout = 1.5
         self.unidades = []
-        self.contador_unidades = 3
+        self.contador_unidades = 2
         self.turmas_encontradas = []
         self.contador_turmas = 0
         self.regex_turma = re.compile(
-            r'^(?P<turma>\d{2})\s+'                                                      # Captura o número da turma (2 dígitos)
-            r'(?P<periodo>\d{4}\.\d)\s+'                                                        # Captura o período no formato XXXX.X
-            r'(?P<docente>(?:[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ ]+ ?(?:\(\d+h\))?\n?)+)'                     # Captura um ou mais docentes (inclui possível quebra de linha)
-            r'\n?(?P<horario>[A-Z0-9]+)'                                                        # Captura o horário no formato de letras e números (ex: 35N34)
-            r'\s?(?P<complemento_horario>\([\d/ -]+\))?'                                        # Captura o complemento do horário (opcional), no formato (DD/MM/AAAA - DD/MM/AAAA)
-            r'\s+(?P<vagas_total>\d+)\s+'                                                       # Captura o número total de vagas
-            r'(?P<vagas_ocupadas>\d+)\s+'                                                       # Captura o número de vagas ocupadas
-            r'(?P<local>.+)$',                                                                  # Captura o local
+            r'^(?P<turma>\d{2})\s+'  # Captura o número da turma (2 dígitos)
+            r'(?P<periodo>\d{4}\.\d)\s+'  # Captura o período no formato XXXX.X
+            r'(?P<docente>(?:[A-Za-zÀ-ÿ ]+(?: [A-Za-zÀ-ÿ ]+)+ ?(?:\(\d+h\))?\n?)+)'  # Captura um ou mais docentes (inclui possível quebra de linha)
+            r'\n?(?P<horario>[A-Z0-9 ]+)'  # Captura o horário no formato de letras e números (ex: 7M1234 6T2345)
+            r'\s?(?P<complemento_horario>\([\d/ -]+\))?'  # Captura o complemento do horário (opcional), no formato (DD/MM/AAAA - DD/MM/AAAA)
+            r'\s+(?P<vagas_total>\d+)\s+'  # Captura o número total de vagas
+            r'(?P<vagas_ocupadas>\d+)\s+'  # Captura o número de vagas ocupadas
+            r'(?P<local>.+)$',  # Captura o local
             re.MULTILINE
         )
 
@@ -159,7 +160,6 @@ class SigaaScraper:
 
     def insere_disciplina(self, driver):
         for turma in self.turmas_encontradas:
-            time.sleep(2)
             try:
                 elemento = WebDriverWait(driver, self.timeout).until(
                     EC.element_to_be_clickable((By.ID, turma))
@@ -292,7 +292,7 @@ class SigaaScraper:
                     curso_info['coequivalencia'],
                     curso_info['equivalencia'],
                 ))
-
+                time.sleep(2)
                 driver.back()
                 WebDriverWait(driver, self.timeout).until(
                     EC.presence_of_element_located((By.CLASS_NAME, 'agrupador'))
@@ -305,10 +305,8 @@ class SigaaScraper:
             div_turmas = driver.find_element(By.ID, 'turmasAbertas')
             tbody = div_turmas.find_element(By.TAG_NAME, 'tbody')
             linhas_turmas = tbody.find_elements(By.TAG_NAME, 'tr')
-
             i = 0
             codigo = ''
-
             while i < len(linhas_turmas):
                 linha = linhas_turmas[i]
                 if 'agrupador' in linha.get_attribute('class'):
@@ -317,13 +315,19 @@ class SigaaScraper:
                     continue
 
                 while i < len(linhas_turmas) and 'agrupador' not in linhas_turmas[i].get_attribute('class'):
+                    print(linhas_turmas[i].text.upper())
                     texto = re.sub(r'\(\d+h\)', '', linhas_turmas[i].text)
                     match = self.regex_turma.search(texto)
                     if match:
                         resultado = match.groupdict()
                         professores = resultado['docente'].strip().split('\n')
+
+                        codigo_lugar = db.execute_fetchone("""
+                            SELECT inserir_lugar(%s)
+                        """, (resultado['local'],))[0]
+
                         db.execute_commit("""
-                            SELECT inserir_oferta(%s::CodigoDisciplina, %s::NUMERIC, %s::SMALLINT, %s::CHAR(30), %s::CHAR(30), %s::SMALLINT, %s::SMALLINT, %s::CHAR(60), %s::TEXT[]);
+                            SELECT inserir_oferta(%s::CodigoDisciplina, %s::NUMERIC, %s::SMALLINT, %s::CHAR(30), %s::CHAR(30), %s::SMALLINT, %s::SMALLINT, %s::INTEGER, %s::TEXT[]);
                         """, (
                             codigo,
                             float(resultado['periodo']),
@@ -332,7 +336,7 @@ class SigaaScraper:
                             resultado['complemento_horario'],
                             int(resultado['vagas_total']),
                             int(resultado['vagas_ocupadas']),
-                            resultado['local'],
+                            codigo_lugar,
                             professores,
                         ))
 
@@ -355,23 +359,35 @@ class SigaaScraper:
                 return
         except NoSuchElementException:
             pass
+        self.insere_oferta(driver)
         self.insere_disciplina(driver)
         self.insere_oferta(driver)
 
     def getPage(self):
+        self.contador_proxies += 1
+        self.contador_proxies % len(proxies)
+
         service = Service()
         options = webdriver.ChromeOptions()
-        # options.add_argument(f'--proxy-server={self.proxy}')
+        # options.add_argument(f'--proxy-server={proxies[self.contador_proxies]}')
         driver = webdriver.Chrome(service=service, options=options)
         driver.get(self.url)
-
         self.set_unidades(driver)
         for _ in self.unidades:
             self.atualiza_unidade(driver)
+
         driver.quit()
-        return
+
 
 scraper = SigaaScraper()
 db.connect()
+# threads = []
+# for _ in range(5):
+#     thread = threading.Thread(target=scraper.getPage)
+#     thread.start()
+#     threads.append(thread)
+#
+# for thread in threads:
+#     thread.join()
 scraper.getPage()
 db.close()
