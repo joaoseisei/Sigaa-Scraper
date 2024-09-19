@@ -10,39 +10,49 @@
 BEGIN;
 
 CREATE FUNCTION inserir_oferta(
-    _codigo CodigoDisciplina, 
-    _periodo NUMERIC(5, 1), 
-    _turma SMALLINT, 
-    _horario CHAR(30), 
-    _complemento_horario CHAR(30), 
-    _vagas_total SMALLINT, 
-    _vagas_ocupadas SMALLINT, 
-    _lugar INTEGER, 
+    _codigo CodigoDisciplina,
+    _periodo NUMERIC(5, 1),
+    _turma CHAR(3),
+    _horario CodigoHorario[],
+    _complemento_horario CHAR(30),
+    _vagas_total SMALLINT,
+    _vagas_ocupadas SMALLINT,
+    _nome_lugar TEXT,
     _professores TEXT[]
 )
 RETURNS VOID AS $$
 DECLARE
     id_prof INTEGER;
     id_oferta INTEGER;
+    id_lugar INTEGER;
+    id_horario INTEGER;
     prof TEXT;
+    hor codigohorario;
 BEGIN
-    INSERT INTO disciplina_ofertada (
-        codigo, periodo, turma, horario, complemento_horario, 
-        vagas_total, vagas_ocupadas, lugar
-    )
-    VALUES (
-        _codigo, _periodo, _turma, _horario, _complemento_horario, 
-        _vagas_total, _vagas_ocupadas, _lugar
-    )
-    RETURNING id INTO id_oferta; 
+
+    SELECT id INTO id_lugar
+    FROM lugar
+    WHERE nome = _nome_lugar;
+
+    IF NOT FOUND THEN
+        INSERT INTO lugar (nome)
+        VALUES (_nome_lugar)
+        RETURNING id INTO id_lugar;
+    END IF;
+
+    INSERT INTO disciplina_ofertada (codigo, periodo, turma, complemento_horario,vagas_total, vagas_ocupadas, lugar)
+    VALUES (_codigo, _periodo, _turma, _complemento_horario,_vagas_total, _vagas_ocupadas, id_lugar)
+    RETURNING id INTO id_oferta;
 
     FOREACH prof IN ARRAY _professores
     LOOP
-        SELECT id INTO id_prof FROM professor WHERE nome = prof;
-        
+        SELECT id INTO id_prof
+        FROM professor
+        WHERE nome = prof;
+
         IF NOT FOUND THEN
             INSERT INTO professor (nome)
-            VALUES (prof) 
+            VALUES (prof)
             RETURNING id INTO id_prof;
         END IF;
 
@@ -50,8 +60,23 @@ BEGIN
         VALUES (id_prof, id_oferta);
     END LOOP;
 
+    FOREACH hor IN ARRAY _horario
+    LOOP
+        SELECT id INTO id_horario
+        FROM horario
+        WHERE codigo = hor;
+
+        IF FOUND THEN
+            INSERT INTO disciplina_horario (horario, disciplina_ofertada)
+        VALUES (id_horario, id_oferta);
+        END IF;
+
+    END LOOP;
+
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+   
+   
    
 CREATE FUNCTION inserir_unidade(
     _unidade TEXT,
@@ -74,25 +99,40 @@ BEGIN
     RETURN id_unidade;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
    
-CREATE FUNCTION inserir_lugar(
-    _nome TEXT
-)
-RETURNS INTEGER AS $$
+   
+CREATE FUNCTION popula_turmas()
+RETURNS VOID AS $$
 DECLARE
-    id_lugar INTEGER;
+    i INT;
+    j INT;
+    resultado CodigoHorario;
 BEGIN
-    SELECT id INTO id_lugar 
-    FROM lugar 
-    WHERE nome = _nome;
+    FOR i IN 1..5 LOOP
+        FOR j IN 2..7 LOOP
+			resultado := j || 'M' || i;
+			INSERT INTO horario (codigo)
+			VALUES (resultado);
+        END LOOP;
+    END LOOP;
 
-    IF NOT FOUND THEN
-        INSERT INTO lugar (nome)
-        VALUES (_nome)
-        RETURNING id INTO id_lugar;
-    END IF;
+    FOR i IN 1..7 LOOP
+        FOR j IN 2..7 LOOP
+			resultado := j || 'T' || i;
+			INSERT INTO horario (codigo)
+			VALUES (resultado);
+        END LOOP;
+    END LOOP;
 
-    RETURN id_lugar;
+    FOR i IN 1..4 LOOP
+        FOR j IN 2..7 LOOP
+			resultado := j || 'N' || i;
+			INSERT INTO horario (codigo)
+			VALUES (resultado);
+        END LOOP;
+    END LOOP;
+	
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

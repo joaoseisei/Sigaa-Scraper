@@ -9,8 +9,11 @@
 ````sql
 BEGIN;
 
+
 CREATE DOMAIN CodigoDisciplina AS CHAR(7) CHECK (VALUE ~ '^[A-Z]{3}[0-9]{4}$');
+CREATE DOMAIN CodigoHorario AS CHAR(3) CHECK (VALUE ~ '^[1-7]{1}[MTN][1-7]$');
 CREATE TYPE TipoModalidade AS ENUM('presencial', 'distancia', 'outra');
+
 
 CREATE TABLE unidade_responsavel (
     id SERIAL NOT NULL,
@@ -18,7 +21,6 @@ CREATE TABLE unidade_responsavel (
     cidade CHAR(15) NOT NULL,
     PRIMARY KEY (id)
 );
-
 CREATE INDEX unidadex_unidade ON unidade_responsavel(unidade);
 
 
@@ -49,47 +51,65 @@ CREATE TABLE disciplina (
     PRIMARY KEY (codigo),
     FOREIGN KEY (unidade) REFERENCES unidade_responsavel(id)
 );
-
 CREATE INDEX unidadex_disciplina ON disciplina(unidade);
 
-CREATE TABLE professor (
-    id SERIAL NOT NULL,
-    nome TEXT UNIQUE NOT NULL,
-    PRIMARY KEY (id)
-);
-
-CREATE INDEX nomex_professor ON professor(nome);
-
-CREATE TABLE professor_oferta (
-    professor INTEGER NOT NULL,
-    disciplina_ofertada INTEGER NOT NULL,
-    PRIMARY KEY (professor, disciplina_ofertada)
-);
 
 CREATE TABLE lugar (
     id SERIAL NOT NULL,
     nome TEXT UNIQUE NOT NULL,
     PRIMARY KEY (id)
 );
-
 CREATE INDEX nomex_lugar ON lugar(nome);
+
 
 CREATE TABLE disciplina_ofertada(
     id SERIAL NOT NULL,
     codigo CodigoDisciplina NOT NULL,
     periodo NUMERIC(5, 1) NOT NULL,
-    turma CHAR(5) NOT NULL,
-    horario CHAR(30) NOT NULL,
-    complemento_horario CHAR(30) NULL,
+    turma CHAR(3) NOT NULL,
+    complemento_horario TEXT NULL,
     vagas_total SMALLINT NOT NULL,
     vagas_ocupadas SMALLINT NOT NULL CHECK (vagas_ocupadas <= vagas_total),
     lugar INTEGER NOT NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (lugar) REFERENCES lugar(id),
-	CONSTRAINT unique_codigox_oferta UNIQUE (codigo, periodo, turma)
+    CONSTRAINT unique_codigox_oferta UNIQUE (codigo, periodo, turma)
+);
+CREATE INDEX codigox_oferta ON disciplina_ofertada(codigo, periodo, turma);
+
+
+CREATE TABLE professor (
+    id SERIAL NOT NULL,
+    nome TEXT UNIQUE NOT NULL,
+    PRIMARY KEY (id)
+);
+CREATE INDEX nomex_professor ON professor(nome);
+
+
+CREATE TABLE professor_oferta (
+    professor INTEGER NOT NULL,
+    disciplina_ofertada INTEGER NOT NULL,
+    PRIMARY KEY (professor, disciplina_ofertada),
+    FOREIGN KEY (professor) REFERENCES professor(id),
+    FOREIGN KEY (disciplina_ofertada) REFERENCES disciplina_ofertada(id)
 );
 
-CREATE INDEX codigox_oferta ON disciplina_ofertada(codigo, periodo, turma);
+
+CREATE TABLE horario (
+    id SERIAL NOT NULL,
+    codigo CodigoHorario UNIQUE NOT NULL,
+    PRIMARY KEY (id)
+);
+
+
+CREATE TABLE disciplina_horario (
+    horario INTEGER NOT NULL,
+    disciplina_ofertada INTEGER NOT NULL,
+    PRIMARY KEY (horario, disciplina_ofertada),
+    FOREIGN KEY (horario) REFERENCES horario(id),
+    FOREIGN KEY (disciplina_ofertada) REFERENCES disciplina_ofertada(id)
+);
+
 
 CREATE TABLE requisitos (
     codigo CodigoDisciplina NOT NULL,
@@ -100,6 +120,7 @@ CREATE TABLE requisitos (
     FOREIGN KEY (codigo) REFERENCES disciplina(codigo)
 );
 
+
 CREATE TABLE equivalencia (
     disciplina_original CodigoDisciplina NOT NULL,
     disciplina_equivalente CodigoDisciplina NOT NULL,
@@ -107,6 +128,7 @@ CREATE TABLE equivalencia (
     FOREIGN KEY (disciplina_original) REFERENCES disciplina(codigo),
     FOREIGN KEY (disciplina_equivalente) REFERENCES disciplina(codigo)
 );
+
 
 CREATE TABLE prerequisito (
     disciplina_original CodigoDisciplina NOT NULL,
@@ -116,6 +138,7 @@ CREATE TABLE prerequisito (
     FOREIGN KEY (disciplina_requisito) REFERENCES disciplina(codigo)
 );
 
+
 CREATE TABLE coequivalencia (
     disciplina_original CodigoDisciplina NOT NULL,
     disciplina_coequivalente CodigoDisciplina NOT NULL,
@@ -124,7 +147,9 @@ CREATE TABLE coequivalencia (
     FOREIGN KEY (disciplina_coequivalente) REFERENCES disciplina(codigo)
 );
 
+
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO kd_user;
+
 
 COMMIT;
 ````
