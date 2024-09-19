@@ -134,9 +134,7 @@ class SigaaScraper:
                 EC.element_to_be_clickable((By.ID, 'formTurma:inputDepto'))
             )
             select = Select(elemento)
-            self.contador_unidades += 1
             select.select_by_value(self.unidades[self.contador_unidades])
-
         except (NoSuchElementException, TimeoutException) as e:
             print(f'Erro ao localizar o dropdown: {e}')
 
@@ -346,8 +344,6 @@ class SigaaScraper:
                                     for horas in partes[2]:
                                         horario_correto.append(f'{dias}{partes[1]}{horas}')
 
-                        print("ERRO",linhas_turmas[i].text, "\n", horario_correto )
-
                         db.execute_commit("""
                             SELECT inserir_oferta(%s::CodigoDisciplina, %s::NUMERIC, %s::CHAR(3), %s::CodigoHorario[], %s::CHAR(30), %s::SMALLINT, %s::SMALLINT, %s::TEXT, %s::TEXT[]);
                         """, (
@@ -382,7 +378,7 @@ class SigaaScraper:
         except NoSuchElementException:
             pass
         self.insere_oferta(driver)
-        self.insere_disciplina(driver)
+        # self.insere_disciplina(driver)
 
 
     def getPage(self):
@@ -397,8 +393,11 @@ class SigaaScraper:
         driver = webdriver.Chrome(service=service, options=options)
         driver.get(self.url)
         self.set_unidades(driver)
-        for _ in self.unidades:
+        for i, _ in enumerate(self.unidades):
+            self.contador_unidades = i
             self.atualiza_unidade(driver)
+
+        print(logo)
 
         driver.quit()
 
