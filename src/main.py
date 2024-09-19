@@ -1,11 +1,10 @@
 import re
-import time
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 import psycopg2
 import unicodedata
 import threading
@@ -75,9 +74,12 @@ class DatabaseConnection:
         try:
             self.cursor.execute(query, params)
             self.connection.commit()
-            print("\033[92mAlterações salvas no banco de dados.\033[0m")
+            if params:
+                print(f'\033[92mSucesso na execução: {params}\033[0m')
+            else:
+                print(f'\033[92mSucesso na execução: {query}\033[0m')
         except Exception as error:
-            print("\033[91mErro ao executar e salvar a consulta:\033[0m", error)
+            print("\033[91mErro na execução:\033[0m", error)
             self.connection.rollback()
 
 db = DatabaseConnection()
@@ -93,31 +95,30 @@ def extrair_numero(texto):
 def remover_acentos(texto):
     nfkd = unicodedata.normalize('NFD', texto)
     texto_sem_acento = ''.join([c for c in nfkd if not unicodedata.combining(c)])
-    return texto_sem_acento
+    return texto_sem_acento.strip()
+
 
 class SigaaScraper:
     def __init__(self):
         self.url = "https://sigaa.unb.br/sigaa/public/turmas/listar.jsf"
-        self.timeout = 2
+        self.timeout = 0
         self.contador_proxies = 0
         self.unidades = []
         self.contador_unidades = 0
         self.turmas_encontradas = []
-        self.contador_turmas = 0
         self.regex_turma = re.compile(
-            r'^(?P<turma>.*)\s+'  # Captura o número da turma (2 dígitos)
-            r'(?P<periodo>\d{4}\.\d)\s+'  # Captura o período no formato XXXX.X
-            r'(?P<docente>(?:[A-Za-zÀ-ÿ ]+(?: [A-Za-zÀ-ÿ ]+)+ ?(?:\(\d+h\))?\n?)+)'  # Captura um ou mais docentes (inclui possível quebra de linha)
-            r'\n?(?P<horario>[A-Z0-9 ]+)'  # Captura o horário no formato de letras e números (ex: 7M1234 6T2345)
-            r'\s?(?P<complemento_horario>\([\d/ -]+\))?'  # Captura o complemento do horário (opcional), no formato (DD/MM/AAAA - DD/MM/AAAA)
-            r'\s+(?P<vagas_total>\d+)\s+'  # Captura o número total de vagas
-            r'(?P<vagas_ocupadas>\d+)\s+'  # Captura o número de vagas ocupadas
-            r'(?P<local>.+)$',  # Captura o local
+            r'^(?P<turma>.*)\s+'                                                                            
+            r'(?P<periodo>\d{4}\.\d)\s+'  
+            r'(?P<docente>(?:[A-Za-zÀ-ÿ ]+(?: [A-Za-zÀ-ÿ ]+)+ ?(?:\(\d+h\))?\n?)+)' 
+            r'\n?(?P<horario>[A-Z0-9 ]+)' 
+            r'\s?(?P<complemento_horario>\([\d/ -]+\))?' 
+            r'\s+(?P<vagas_total>\d+)\s+' 
+            r'(?P<vagas_ocupadas>\d+)\s+' 
+            r'(?P<local>.+)$',
             re.MULTILINE
         )
 
     def set_unidades(self, driver):
-        time.sleep(1)
         try:
             elemento = WebDriverWait(driver, self.timeout).until(
                 EC.element_to_be_clickable((By.ID, 'formTurma:inputDepto'))
@@ -301,7 +302,6 @@ class SigaaScraper:
                     curso_info['coequivalencia'],
                     curso_info['equivalencia'],
                 ))
-                time.sleep(2)
                 driver.back()
                 WebDriverWait(driver, self.timeout).until(
                     EC.presence_of_element_located((By.CLASS_NAME, 'agrupador'))
@@ -344,22 +344,24 @@ class SigaaScraper:
                                     for horas in partes[2]:
                                         horario_correto.append(f'{dias}{partes[1]}{horas}')
 
-                        db.execute_commit("""
-                            SELECT inserir_oferta(%s::CodigoDisciplina, %s::NUMERIC, %s::CHAR(3), %s::CodigoHorario[], %s::CHAR(30), %s::SMALLINT, %s::SMALLINT, %s::TEXT, %s::TEXT[]);
-                        """, (
-                            codigo,
-                            float(resultado['periodo']),
-                            resultado['turma'],
-                            horario_correto,
-                            resultado['complemento_horario'],
-                            int(resultado['vagas_total']),
-                            int(resultado['vagas_ocupadas']),
-                            lugar_formatado,
-                            professores_formatados,
-                        ))
-
+                        if len(horario_correto) == 0:
+                            print(f'\033[93mDisciplina não possui todos os dados: {codigo} {linhas_turmas[i].text.replace('\n', '').replace('\r', '')}\033[0m')
+                        else:
+                            db.execute_commit("""
+                                SELECT inserir_oferta(%s::CodigoDisciplina, %s::NUMERIC, %s::CHAR(3), %s::CodigoHorario[], %s::CHAR(30), %s::SMALLINT, %s::SMALLINT, %s::TEXT, %s::TEXT[]);
+                            """, (
+                                codigo,
+                                float(resultado['periodo']),
+                                resultado['turma'],
+                                horario_correto,
+                                resultado['complemento_horario'],
+                                int(resultado['vagas_total']),
+                                int(resultado['vagas_ocupadas']),
+                                lugar_formatado,
+                                professores_formatados,
+                            ))
                     else:
-                        print("ERRO: ", linhas_turmas[i].text)
+                        print(f'\033[93mDisciplina não possui todos os dados: {codigo} {linhas_turmas[i].text.replace('\n', '').replace('\r', '')}\033[0m')
                     i += 1
         except NoSuchElementException:
             print("A div com ID 'turmasAbertas' não foi encontrada.")
@@ -373,7 +375,6 @@ class SigaaScraper:
         try:
             painel_erros = driver.find_element(By.ID, 'painel-erros')
             if painel_erros.is_displayed():
-                time.sleep(2)
                 return
         except NoSuchElementException:
             pass
@@ -398,13 +399,12 @@ class SigaaScraper:
             self.atualiza_unidade(driver)
 
         print(logo)
-
         driver.quit()
 
 
 scraper = SigaaScraper()
 db.connect()
-# threads = []
+threads = []
 # for _ in range(5):
 #     thread = threading.Thread(target=scraper.getPage)
 #     thread.start()
