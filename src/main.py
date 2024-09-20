@@ -9,6 +9,7 @@ import psycopg2
 import unicodedata
 import threading
 
+
 logo = r"""
 $$\   $$\ $$$$$$$\                                     $$$$$$\   $$$$$$\  
 $$ | $$  |$$  __$$\                                   $$  __$$\ $$  __$$\ 
@@ -316,10 +317,13 @@ class SigaaScraper:
             linhas_turmas = tbody.find_elements(By.TAG_NAME, 'tr')
             i = 0
             codigo = ''
+            nome = ''
             while i < len(linhas_turmas):
                 linha = linhas_turmas[i]
                 if 'agrupador' in linha.get_attribute('class'):
-                    codigo = linha.text.split(' ')[0]
+                    grupo = linha.text.split(' - ')
+                    codigo = grupo[0].strip()
+                    nome = grupo[1].strip().upper()
                     i += 1
                     continue
 
@@ -348,11 +352,12 @@ class SigaaScraper:
                             print(f'\033[93mDisciplina não possui todos os dados: {codigo} {linhas_turmas[i].text.replace('\n', '').replace('\r', '')}\033[0m')
                         else:
                             db.execute_commit("""
-                                SELECT inserir_oferta(%s::CodigoDisciplina, %s::NUMERIC, %s::CHAR(3), %s::CodigoHorario[], %s::CHAR(30), %s::SMALLINT, %s::SMALLINT, %s::TEXT, %s::TEXT[]);
+                                SELECT inserir_oferta(%s::CodigoDisciplina, %s::NUMERIC, %s::CHAR(3), %s::TEXT, %s::CodigoHorario[], %s::CHAR(30), %s::SMALLINT, %s::SMALLINT, %s::TEXT, %s::TEXT[]);
                             """, (
                                 codigo,
                                 float(resultado['periodo']),
                                 resultado['turma'],
+                                nome,
                                 horario_correto,
                                 resultado['complemento_horario'],
                                 int(resultado['vagas_total']),

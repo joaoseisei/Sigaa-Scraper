@@ -13,6 +13,7 @@ CREATE FUNCTION inserir_oferta(
     _codigo CodigoDisciplina,
     _periodo NUMERIC(5, 1),
     _turma CHAR(3),
+    _nome TEXT,
     _horario CodigoHorario[],
     _complemento_horario CHAR(30),
     _vagas_total SMALLINT,
@@ -40,8 +41,8 @@ BEGIN
         RETURNING id INTO id_lugar;
     END IF;
 
-    INSERT INTO disciplina_ofertada (codigo, periodo, turma, complemento_horario,vagas_total, vagas_ocupadas, lugar)
-    VALUES (_codigo, _periodo, _turma, _complemento_horario,_vagas_total, _vagas_ocupadas, id_lugar)
+    INSERT INTO disciplina_ofertada (codigo, periodo, turma, nome, complemento_horario,vagas_total, vagas_ocupadas, lugar)
+    VALUES (_codigo, _periodo, _turma, _nome, _complemento_horario,_vagas_total, _vagas_ocupadas, id_lugar)
     RETURNING id INTO id_oferta;
 
     FOREACH prof IN ARRAY _professores

@@ -67,6 +67,7 @@ CREATE TABLE disciplina_ofertada(
     codigo CodigoDisciplina NOT NULL,
     periodo NUMERIC(5, 1) NOT NULL,
     turma CHAR(3) NOT NULL,
+    nome TEXT NOT NULL,
     complemento_horario TEXT NULL,
     vagas_total SMALLINT NOT NULL,
     vagas_ocupadas SMALLINT NOT NULL CHECK (vagas_ocupadas <= vagas_total),
@@ -76,6 +77,7 @@ CREATE TABLE disciplina_ofertada(
     CONSTRAINT unique_codigox_oferta UNIQUE (codigo, periodo, turma)
 );
 CREATE INDEX codigox_oferta ON disciplina_ofertada(codigo, periodo, turma);
+
 
 
 CREATE TABLE professor (
