@@ -1,4 +1,6 @@
 import re
+import time
+
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -7,7 +9,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 import psycopg2
 import unicodedata
-import threading
 
 
 logo = r"""
@@ -102,7 +103,7 @@ def remover_acentos(texto):
 class SigaaScraper:
     def __init__(self):
         self.url = "https://sigaa.unb.br/sigaa/public/turmas/listar.jsf"
-        self.timeout = 0
+        self.timeout = 2.5
         self.contador_proxies = 0
         self.unidades = []
         self.contador_unidades = 0
@@ -168,6 +169,7 @@ class SigaaScraper:
 
     def insere_disciplina(self, driver):
         for turma in self.turmas_encontradas:
+            time.sleep(self.timeout)
             try:
                 elemento = WebDriverWait(driver, self.timeout).until(
                     EC.element_to_be_clickable((By.ID, turma))
@@ -303,6 +305,7 @@ class SigaaScraper:
                     curso_info['coequivalencia'],
                     curso_info['equivalencia'],
                 ))
+                time.sleep(self.timeout)
                 driver.back()
                 WebDriverWait(driver, self.timeout).until(
                     EC.presence_of_element_located((By.CLASS_NAME, 'agrupador'))
@@ -380,11 +383,13 @@ class SigaaScraper:
         try:
             painel_erros = driver.find_element(By.ID, 'painel-erros')
             if painel_erros.is_displayed():
+                time.sleep(self.timeout)
                 return
         except NoSuchElementException:
             pass
         self.insere_oferta(driver)
-        # self.insere_disciplina(driver)
+        self.insere_disciplina(driver)
+        time.sleep(self.timeout)
 
 
     def getPage(self):
@@ -399,23 +404,21 @@ class SigaaScraper:
         driver = webdriver.Chrome(service=service, options=options)
         driver.get(self.url)
         self.set_unidades(driver)
-        for i, _ in enumerate(self.unidades):
-            self.contador_unidades = i
-            self.atualiza_unidade(driver)
-
-        print(logo)
         driver.quit()
+
+        for num, _ in enumerate(self.unidades):
+            self.contador_unidades = num
+            service = Service()
+            options = webdriver.ChromeOptions()
+            driver = webdriver.Chrome(service=service, options=options)
+            driver.get(self.url)
+            self.set_unidades(driver)
+            self.atualiza_unidade(driver)
+            driver.quit()
+        print(logo)
 
 
 scraper = SigaaScraper()
 db.connect()
-threads = []
-# for _ in range(5):
-#     thread = threading.Thread(target=scraper.getPage)
-#     thread.start()
-#     threads.append(thread)
-#
-# for thread in threads:
-#     thread.join()
 scraper.getPage()
 db.close()
