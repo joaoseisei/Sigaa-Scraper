@@ -1,12 +1,3 @@
-<center>
-
-# Triggers e Stored Procedure
-
-</center>
-
----
-
-````sql
 BEGIN;
 
 CREATE FUNCTION inserir_oferta(
@@ -76,9 +67,9 @@ BEGIN
 
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-   
-   
-   
+
+
+
 CREATE FUNCTION inserir_unidade(
     _unidade TEXT,
     _cidade CHAR(15)
@@ -87,8 +78,8 @@ RETURNS INTEGER AS $$
 DECLARE
     id_unidade INTEGER;
 BEGIN
-    SELECT id INTO id_unidade 
-    FROM unidade_responsavel 
+    SELECT id INTO id_unidade
+    FROM unidade_responsavel
     WHERE unidade = _unidade;
 
     IF NOT FOUND THEN
@@ -101,8 +92,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-   
-   
+
+
 CREATE FUNCTION popula_turmas()
 RETURNS VOID AS $$
 DECLARE
@@ -112,31 +103,28 @@ DECLARE
 BEGIN
     FOR i IN 1..5 LOOP
         FOR j IN 2..7 LOOP
-			resultado := j || 'M' || i;
-			INSERT INTO horario (codigo)
-			VALUES (resultado);
+          resultado := j || 'M' || i;
+          INSERT INTO horario (codigo) VALUES (resultado)
+          ON CONFLICT (codigo) DO NOTHING;
         END LOOP;
     END LOOP;
 
     FOR i IN 1..7 LOOP
         FOR j IN 2..7 LOOP
-			resultado := j || 'T' || i;
-			INSERT INTO horario (codigo)
-			VALUES (resultado);
+          resultado := j || 'T' || i;
+          INSERT INTO horario (codigo) VALUES (resultado)
+          ON CONFLICT (codigo) DO NOTHING;
         END LOOP;
     END LOOP;
 
     FOR i IN 1..4 LOOP
         FOR j IN 2..7 LOOP
-			resultado := j || 'N' || i;
-			INSERT INTO horario (codigo)
-			VALUES (resultado);
+          resultado := j || 'N' || i;
+          INSERT INTO horario (codigo) VALUES (resultado)
+          ON CONFLICT (codigo) DO NOTHING;
         END LOOP;
     END LOOP;
-	
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 COMMIT;
-
-````

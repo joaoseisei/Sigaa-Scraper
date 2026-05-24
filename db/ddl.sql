@@ -1,12 +1,3 @@
-<center>
-
-# Criação das Tabelas
-
-</center>
-
----
-
-````sql
 BEGIN;
 
 
@@ -154,4 +145,3 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO kd_user;
 
 
 COMMIT;
-````

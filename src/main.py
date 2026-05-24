@@ -1,5 +1,6 @@
 import re
 import time
+import os
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -7,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.webdriver.common.alert import Alert
 import psycopg2
 import unicodedata
 
@@ -28,13 +30,11 @@ with open('proxies_funcionais.txt', 'r') as f:
 
 class DatabaseConnection:
     def __init__(self):
-        self.database = "KDmeuSS"
-        self.user = "kd_user"
-        self.password = "123"
-        self.host = "localhost"
-        self.port = "5432"
-        self.connection = None
-        self.cursor = None
+        self.database = os.getenv("DB_NAME", "KDmeuSS")
+        self.user     = os.getenv("DB_USER", "kd_user")
+        self.password = os.getenv("DB_PASSWORD", "123")
+        self.host     = os.getenv("DB_HOST", "localhost")
+        self.port     = os.getenv("DB_PORT", "5432")
 
     def connect(self):
         try:
@@ -120,6 +120,14 @@ class SigaaScraper:
             re.MULTILINE
         )
 
+    def fechar_alert(self, driver):
+        try:
+            alert = driver.switch_to.alert
+            alert.accept()
+            return True
+        except:
+            return False
+
     def set_unidades(self, driver):
         try:
             elemento = WebDriverWait(driver, self.timeout).until(
@@ -160,6 +168,7 @@ class SigaaScraper:
             print(f"Erro ao tentar clicar em buscar: {e}")
 
     def buscar_info_materias(self, driver):
+        self.fechar_alert(driver)
         linhas = driver.find_elements(By.CLASS_NAME, 'agrupador')
         for linha in linhas:
             link = linha.find_element(By.TAG_NAME, 'a')
@@ -379,18 +388,24 @@ class SigaaScraper:
         self.escolher_nivel(driver)
         self.escolhe_unidade(driver)
         self.buscar(driver)
-        self.buscar_info_materias(driver)
+        self.fechar_alert(driver)
+
+        print(f'[DEBUG] Unidade {self.contador_unidades}: {self.unidades[self.contador_unidades]}')
+
         try:
             painel_erros = driver.find_element(By.ID, 'painel-erros')
             if painel_erros.is_displayed():
+                print(f'[DEBUG] painel-erros visível, pulando unidade')
                 time.sleep(self.timeout)
                 return
         except NoSuchElementException:
             pass
+
+        self.buscar_info_materias(driver)
+        print(f'[DEBUG] turmas encontradas: {len(self.turmas_encontradas)}')
         self.insere_oferta(driver)
         self.insere_disciplina(driver)
         time.sleep(self.timeout)
-
 
     def getPage(self):
         self.contador_proxies += 1
@@ -398,19 +413,20 @@ class SigaaScraper:
 
         db.execute_commit("SELECT popula_turmas()")
 
-        service = Service()
         options = webdriver.ChromeOptions()
-        # options.add_argument(f'--proxy-server={proxies[self.contador_proxies]}')
-        driver = webdriver.Chrome(service=service, options=options)
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+
+        driver = webdriver.Chrome(service=Service(), options=options)
         driver.get(self.url)
         self.set_unidades(driver)
         driver.quit()
 
         for num, _ in enumerate(self.unidades):
             self.contador_unidades = num
-            service = Service()
-            options = webdriver.ChromeOptions()
-            driver = webdriver.Chrome(service=service, options=options)
+            driver = webdriver.Chrome(service=Service(), options=options)  # reutiliza o mesmo options
             driver.get(self.url)
             self.set_unidades(driver)
             self.atualiza_unidade(driver)
